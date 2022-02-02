@@ -127,8 +127,8 @@ function ObjectControls(camera, domElement, objectToMove) {
 
     let flag,
         mesh = objectToMove,
-        maxDistance = 15,
-        minDistance = 6,
+        maxDistance = 25,
+        minDistance = 3,
         zoomSpeed = 0.5,
         rotationSpeed = 0.05,
         rotationSpeedTouchDevices = 0.05,

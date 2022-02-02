@@ -11,11 +11,11 @@ let QUEUED_CUBES = [];
 let REVEALED_CUBES = [];
 
 let cubeSize = {
-    x: 7,
-    y: 3,
-    z: 7
+    x: 20,
+    y: 2,
+    z: 20
 };
-let bombs = 15;
+let bombs = 80;
 let font;
 let gameOver = false;
 
@@ -92,6 +92,7 @@ function init(){
     zoomControl.disableHorizontalRotation();
     zoomControl.disableVerticalRotation();
 
+
     
 
     
@@ -132,12 +133,12 @@ function buildCube(width, height, length){
     if(height % 2 == 1){
         offsets.y = Math.round(height/2);
     } else {
-        offsets.y = width/2+0.5;
+        offsets.y = height/2+0.5;
     }
     if(length % 2 == 1){
         offsets.z = Math.round(length/2);
     } else {
-        offsets.z = width/2+0.5;
+        offsets.z = length/2+0.5;
     }
 
 
@@ -201,7 +202,6 @@ function addLights(){
 function buildSkybox(){
 
     const materialArray = createMaterialArray("corona");
-
     skyboxGeo = new THREE.BoxGeometry(10000, 10000, 10000);
     skybox = new THREE.Mesh(skyboxGeo, materialArray);
     scene.add(skybox);
