@@ -11,11 +11,11 @@ let QUEUED_CUBES = [];
 let REVEALED_CUBES = [];
 
 let cubeSize = {
-    x: 15,
-    y: 1,
-    z: 15
+    x: 5,
+    y: 5,
+    z: 5
 };
-let bombs = 40;
+let bombs = 15;
 let font;
 let gameOver = false;
 
