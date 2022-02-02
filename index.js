@@ -11,11 +11,11 @@ let QUEUED_CUBES = [];
 let REVEALED_CUBES = [];
 
 let cubeSize = {
-    x: 5,
-    y: 5,
-    z: 5
+    x: 15,
+    y: 1,
+    z: 15
 };
-let bombs = 10;
+let bombs = 40;
 let font;
 let gameOver = false;
 
@@ -125,6 +125,8 @@ function init(){
 
     composer.addPass(bloomPass);
     composer.addPass(copyShader);
+
+
 
     animate();
 
@@ -239,7 +241,7 @@ const textLoader = new THREE.TextureLoader()
 const numbers = []
 
 for(var n = 1; n < 27; n++){
-    numbers.push(textLoader.load("/img/numbers/"+n+".png"))
+    numbers.push(textLoader.load("./img/numbers/"+n+".png"))
 }
 
 function buildCell(x,y,z){
@@ -371,15 +373,15 @@ function animate(){
     for (cube of QUEUED_CUBES){
 
         if (cube.scale.x >= 0){
-            cube.scale.x -= 0.02;
-            cube.scale.y -= 0.02;
-            cube.scale.z -= 0.02;
+            cube.scale.x -= 0.05;
+            cube.scale.y -= 0.05;
+            cube.scale.z -= 0.05;
 
             var coordinates = cube.name.split(",");
             var iX = coordinates[0]; var iY = coordinates[1]; var iZ = coordinates[2];
 
 
-            if (cube.scale.x <= 0.021){
+            if (cube.scale.x <= 0.051){
                 if(bombs_data[iX][iY][iZ] != 0){
                     if(!cube.text){
 
@@ -549,7 +551,7 @@ $(document).mouseup(function(e){
             window.clearInterval(animateClearing);
         }
 
-    }, 50, REVEALED_CUBES.LENGTH);
+    }, 100, REVEALED_CUBES.LENGTH);
 
 });
 
