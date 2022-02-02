@@ -1,13 +1,53 @@
-let scene, camera, renderer, skyboxGeo, skybox, pivot, controls;
+let scene, camera, renderer, skyboxGeo, skybox, pivot, controls, wireframe, zoomControl;
+
 var mouse = new THREE.Vector2();
 
-var cubeGroup;
+let cubeGroup, textGroup;
 var registered_cells = []
 let INTERSECTED;
 let cell_color = 0xdbdbdb;
 
+let QUEUED_CUBES = [];
+let REVEALED_CUBES = [];
+
+let cubeSize = {
+    x: 7,
+    y: 3,
+    z: 7
+};
+let bombs = 15;
+let font;
+let gameOver = false;
+
+var frequency = 0.00000001;
+
+let originalColor = "#edc9ff";
+let currColor;
+
+function rainbow(t){
+
+    var color = changeHue(originalColor, t/20);
+    var num = Number(color.replace("#","0x"));
+    return num;
+}
+
+function changeHue(rgb, degree) {
+    var hsl = rgbToHSL(rgb);
+    hsl.h += degree;
+    if (hsl.h > 360) {
+        hsl.h -= 360;
+    }
+    else if (hsl.h < 0) {
+        hsl.h += 360;
+    }
+    return hslToRGB(hsl);
+}
+
+document.addEventListener('contextmenu', event => event.preventDefault());
+
 function init(){
     scene = new THREE.Scene();
+
     camera = new THREE.PerspectiveCamera(
         45,
         window.innerWidth / window.innerHeight,
@@ -37,14 +77,20 @@ function init(){
 
     addLights();
 
+
     
 
-    buildCube(5,5,5);
+    buildCube(cubeSize.x, cubeSize.y, cubeSize.z);
 
     camera.lookAt(0,0,0);
-    var controls = new GrabControls(renderer, pivot);
+    controls = new GrabControls(renderer, pivot);
 
     controls.run();
+
+    zoomControl = new ObjectControls(camera, renderer.domElement, cubeGroup);
+
+    zoomControl.disableHorizontalRotation();
+    zoomControl.disableVerticalRotation();
 
     
 
@@ -58,6 +104,8 @@ function init(){
 
 function buildCube(width, height, length){
 
+    pivot = new THREE.Group();
+    textGroup = new THREE.Group();
     cubeGroup = new THREE.Group();
 
     for(var x = 0; x < width; x++){
@@ -71,15 +119,65 @@ function buildCube(width, height, length){
     var position = new THREE.Box3().setFromObject(cubeGroup).getCenter(cubeGroup.position).multiplyScalar(-1);
     cubeGroup.position = position;
 
-    pivot = new THREE.Group();
+    pivot.add(textGroup);
+
+
+    var offsets = new THREE.Vector3();
+
+    if(width % 2 == 1){
+        offsets.x = Math.round(width/2);
+    } else {
+        offsets.x = width/2+0.5;
+    }
+    if(height % 2 == 1){
+        offsets.y = Math.round(height/2);
+    } else {
+        offsets.y = width/2+0.5;
+    }
+    if(length % 2 == 1){
+        offsets.z = Math.round(length/2);
+    } else {
+        offsets.z = width/2+0.5;
+    }
+
+
+    textGroup.position.set(-width+offsets.x,-height+offsets.y,-length+offsets.z)
+
+    
     pivot.position.set(0,0,0);
 
     pivot.rotation.y = 2 * Math.PI / 3
     pivot.rotation.x = 1 * Math.PI / 6
 
-    pivot.add(cubeGroup);
+    
+
+    var box = new THREE.Box3().setFromObject(cubeGroup);
+
+    const wireframeGeometry = new THREE.BoxGeometry(box.max.x - box.min.x + 0.5, box.max.y - box.min.y + 0.5, box.max.z - box.min.z + 0.5);
+    var wireframeGeo = new THREE.EdgesGeometry(wireframeGeometry);
+
+    wireframe = new THREE.LineSegments(wireframeGeo);
+
+    wireframe.material.transparent = true;
+    wireframe.material.opacity = 0.5;
+
+    scene.add(wireframe);
+
+    wireframe.position.set(0,0,0);
+
+    pivot.add(cubeGroup, wireframe);
+
+    var m = Math.max(cubeSize.x,cubeSize.y,cubeSize.z);
+
+    pivot.scale.x = (6 / m);
+    pivot.scale.y = (6 / m);
+    pivot.scale.z = (6 / m);
+
+    
+
 
     scene.add(pivot);
+
     
 }
 
@@ -108,6 +206,13 @@ function buildSkybox(){
     skybox = new THREE.Mesh(skyboxGeo, materialArray);
     scene.add(skybox);
 
+}
+
+const textLoader = new THREE.TextureLoader()
+const numbers = []
+
+for(var n = 1; n < 27; n++){
+    numbers.push(textLoader.load("/img/numbers/"+n+".png"))
 }
 
 function buildCell(x,y,z){
@@ -154,10 +259,17 @@ function onDocumentMouseMove(event) {
     // update the mouse variable
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  }
+}
+var frame = 0;
+
+
+
 
 function animate(){
+    frame++;
+    
     renderer.render(scene, camera);
+    
     requestAnimationFrame(animate);
 
     skybox.rotation.y += 0.0001;
@@ -166,35 +278,109 @@ function animate(){
     var vector = new THREE.Vector3(mouse.x, mouse.y, 1);
     vector.unproject(camera);
     var raycaster = new THREE.Raycaster(camera.position, vector.sub(camera.position).normalize());
+    raycaster.camera = camera;
 
 
     var intersects = raycaster.intersectObject(cubeGroup, true);
 
+    currColor = rainbow(frame);
 
-    if (intersects.length > 0) {
+    wireframe.material.color.set(currColor);
+
+    
+    for(cube of cubeGroup.children){
+        if (INTERSECTED == cube) continue;
+        if (FLAGGED_OBJECTS.includes(INTERSECTED)) continue;
+        cube.material.color.set(currColor);
+    }
+
+    for (cube of FLAGGED_OBJECTS){
+        if (INTERSECTED == cube) continue;
+        cube.material.color.set(0xde8202);
+    }
+
+    if(gameOver){
+        for(cube of BOMB_OBJECTS){
+            cube.material.color.set(0xeb1010);
+        }
+    }
+
+
+    if(isDragging && (Math.abs(mouse.x - mouse_original_pos.x)*1000 > 5 || Math.abs(mouse.y - mouse_original_pos.y)*1000 > 5)){
+        $('html,body').css('cursor', 'grabbing');
+    }
+    else if (intersects.length > 0) {
         
         var object = intersects[0].object;
         $('html,body').css('cursor', 'pointer');
 
         if (INTERSECTED && object != INTERSECTED){
 
-            INTERSECTED.material.color.set(cell_color);
+            INTERSECTED.material.color.set(currColor);
             INTERSECTED = null;
 
         }
-        object.material.color.set(0xffff00);
-        INTERSECTED = object;
+        if(!gameOver){
+            object.material.color.set(0xffff00);
+            INTERSECTED = object;
+        }
  
     } else {
         $('html,body').css('cursor', 'default');
         if (INTERSECTED){
-            INTERSECTED.material.color.set(cell_color);
+            INTERSECTED.material.color.set(currColor);
             INTERSECTED = null;
         }
     }
     
+    if(INTERSECTED){
+        var coordinates = INTERSECTED.name.split(",");
+        var iX = coordinates[0]; var iY = coordinates[1]; var iZ = coordinates[2];
+    }
+    
+
 
     
+
+
+    for (cube of QUEUED_CUBES){
+
+        if (cube.scale.x >= 0){
+            cube.scale.x -= 0.02;
+            cube.scale.y -= 0.02;
+            cube.scale.z -= 0.02;
+
+            var coordinates = cube.name.split(",");
+            var iX = coordinates[0]; var iY = coordinates[1]; var iZ = coordinates[2];
+
+
+            if (cube.scale.x <= 0.021){
+                if(bombs_data[iX][iY][iZ] != 0){
+                    if(!cube.text){
+
+                    }
+                }
+
+
+            }
+        }
+
+    }
+
+
+    
+
+    
+}
+
+function get_screen_xy( position, camera ) {
+    var pos = position.clone();
+    projScreenMat = new THREE.Matrix4();
+    projScreenMat.multiplyMatrices( camera.projectionMatrix, camera.matrixWorldInverse );
+    pos.applyMatrix4( projScreenMat );
+
+    return { x: ( pos.x + 1 ) * window.innerWidth / 2,
+        y: ( - pos.y + 1 ) * window.innerHeight / 2 };
 }
 
 window.addEventListener( 'resize', onWindowResize, false );
@@ -208,42 +394,203 @@ function onWindowResize(){
 
 }
 
-init();
-
 revealed = [];
-function reveal(x, y, z){
 
-    console.log("Attempting to reveal",x, y, z);
+function endGame(){
+    gameOver = true;
+    return;
+}
 
-    if (revealed.includes({"x": x, "y": y, "z": z})) return;
+function reveal(initial_reveal, x, y, z){
 
-    var number = bombs_data[x][y][z];
+    if (gameOver) return;
+
+    CLEARING_JOB = true;
+
+    if (revealed.filter(c => c.x == x && c.y == y && c.z == z).length > 0) return;
+
+    var cube = cubeGroup.getObjectByName(`${x},${y},${z}`);
+
+    if(FLAGGED_OBJECTS.includes(cube)) return;
+
+    if(BOMB_OBJECTS.includes(cube)){
+        endGame();
+        return;
+    }
+
+
     revealed.push({"x": x, "y": y, "z": z});
 
-    console.log("Finding Object", x, y, z);
-    cubeGroup.getObjectByName(`${x},${y},${z}`).material.color.set(0x00ffff);
+    if (x < 0 || y < 0 || z < 0 || x >= bombs_data.length || y >= bombs_data[0].length || z >= bombs_data[0][0].length) return;
 
-    console.log("What's the number?", number);
+    var number = bombs_data[x][y][z];
+    
+    var distance_from_initial_click = Math.ceil(Math.sqrt(Math.pow(x - initial_reveal.x, 2) + Math.pow(y - initial_reveal.y, 2) + Math.pow(z - initial_reveal.z, 2)));
+
+    if(typeof REVEALED_CUBES[distance_from_initial_click] === 'undefined'){
+        REVEALED_CUBES[distance_from_initial_click] = []
+    }
+    REVEALED_CUBES[distance_from_initial_click].push(cubeGroup.getObjectByName(`${x},${y},${z}`))
 
     if(number == 0){
         iterate3D(3, 3, 3, function(rX, rY, rZ){
+
             revealX = parseInt(x) + (rX-1);
             revealY = parseInt(y) + (rY-1);
             revealZ = parseInt(z) + (rZ-1);
-            reveal(revealX, revealY, revealZ);
+
+            reveal(initial_reveal, revealX, revealY, revealZ);
         });
     }
+
+    return Promise.resolve(1);
 }
 
-$(document).click(function(e){
+async function reveal_init(initial_reveal, x,y,z){
+    reveal(initial_reveal, x, y, z);
+    return Promise.resolve(1);
+}
+
+let CLEARING_JOB = false;
+
+
+let mouse_original_pos = new THREE.Vector2();
+
+$(document).mousedown(function(e){
+    mouse_original_pos.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse_original_pos.y = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+$(document).mouseup(function(e){
+
+    if(gameOver) return;
+    
+    var mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+    var mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+
+    if (Math.abs(mouseX - mouse_original_pos.x)*1000 > 5 || Math.abs(mouseY - mouse_original_pos.y)*1000 > 5){
+        return;
+    }
+
+
+
+    if(CLEARING_JOB) return;
 
     if(!INTERSECTED) return;
+
+    if(e.which == 3) return rightClick(e);
+    if(e.which != 1) return;
 
     var name = INTERSECTED.name;
 
     var coordinates = name.split(",");
     var iX = coordinates[0]; var iY = coordinates[1]; var iZ = coordinates[2];
 
-    reveal(iX,iY,iZ);
+
+    if(bombs_data == null){
+        generateBoard({
+            x: cubeSize.x, y: cubeSize.y, z: cubeSize.z
+        }, {
+            x: iX, y: iY, z: iZ
+        }, bombs);
+    }
+    
+
+    REVEALED_CUBES = [];
+
+    reveal_init({
+        x: iX,
+        y: iY,
+        z: iZ
+    },iX,iY,iZ).then(() => {
+        return;
+    });
+
+    var animateClearing = setIntervalX(function(index){
+
+        CLEARING_JOB = true;
+
+        var cubes = REVEALED_CUBES[index];
+
+        try {
+            for (cube of cubes) {
+                QUEUED_CUBES.push(cube);
+            }
+        } catch(e){
+            CLEARING_JOB = false;
+            window.clearInterval(animateClearing);
+        }
+
+    }, 50, REVEALED_CUBES.LENGTH);
 
 });
+
+let BOMB_OBJECTS = [];
+let FLAGGED_OBJECTS = [];
+
+function rightClick(e){
+
+    if(!INTERSECTED) return;
+
+    var coordinates = INTERSECTED.name.split(",");
+    var iX = coordinates[0]; var iY = coordinates[1]; var iZ = coordinates[2];
+
+    if(!FLAGGED_OBJECTS.includes(INTERSECTED)){
+
+        FLAGGED_OBJECTS.push(INTERSECTED);
+
+    } else {
+        var index = FLAGGED_OBJECTS.indexOf(INTERSECTED);
+        if (index !== -1){
+            FLAGGED_OBJECTS.splice(index, 1);
+        }
+    }
+
+
+    if(arrayCompare(FLAGGED_OBJECTS, BOMB_OBJECTS)){
+        alert("You win!");
+    }
+
+
+
+}
+
+
+
+function setIntervalX(callback, delay, repetitions) {
+    var x = 0;
+    var intervalID = window.setInterval(function () {
+
+       callback(x);
+
+       if (++x === repetitions) {
+           window.clearInterval(intervalID);
+       }
+    }, delay);
+    return intervalID;
+}
+
+
+function arrayCompare(_arr1, _arr2) {
+    if (
+      !Array.isArray(_arr1)
+      || !Array.isArray(_arr2)
+      || _arr1.length !== _arr2.length
+      ) {
+        return false;
+      }
+    
+    // .concat() to not mutate arguments
+    const arr1 = _arr1.concat().sort((a,b) => (a.uuid > b.uuid) ? 1 : -1 );
+    const arr2 = _arr2.concat().sort((a,b) => (a.uuid > b.uuid) ? 1 : -1 );
+    
+    for (let i = 0; i < arr1.length; i++) {
+        if (arr1[i] !== arr2[i]) {
+            return false;
+         }
+    }
+    
+    return true;
+}
+
+init();

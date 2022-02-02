@@ -1,4 +1,4 @@
-
+var isDragging = false;
 class GrabControls{
 
     constructor(renderer, rotation_object){
@@ -19,7 +19,7 @@ class GrabControls{
         this.rotation_object = rotation_object;
         this.domElement = renderer.domElement;
 
-        this.isDragging = false;
+        isDragging = false;
         this.previousMousePosition = {
             x: 0,
             y: 0
@@ -29,7 +29,6 @@ class GrabControls{
 
             var rotation_object = this.rotation_object;
             var previousMousePosition = this.previousMousePosition;
-            var isDragging = this.isDragging;
     
     
             $(renderer.domElement).on('mousedown', function(e) {
