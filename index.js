@@ -11,9 +11,9 @@ let QUEUED_CUBES = [];
 let REVEALED_CUBES = [];
 
 let cubeSize = {
-    x: 20,
-    y: 2,
-    z: 20
+    x: 5,
+    y: 11,
+    z: 11
 };
 let bombs = 80;
 let font;
