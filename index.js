@@ -1,4 +1,4 @@
-let scene, camera, renderer, skyboxGeo, skybox, pivot, controls, wireframe, zoomControl;
+let scene, camera, renderer, skyboxGeo, skybox, pivot, controls, wireframe, zoomControl, composer;
 
 var mouse = new THREE.Vector2();
 
@@ -12,10 +12,10 @@ let REVEALED_CUBES = [];
 
 let cubeSize = {
     x: 5,
-    y: 11,
-    z: 11
+    y: 5,
+    z: 5
 };
-let bombs = 80;
+let bombs = 10;
 let font;
 let gameOver = false;
 
@@ -98,6 +98,33 @@ function init(){
     
 
     document.addEventListener('pointermove', onDocumentMouseMove, false);
+
+
+    //Initialize post-processing
+    renderScene = new THREE.RenderPass(scene, camera);
+
+    var effectFXAA = new THREE.ShaderPass(THREE.FXAAShader);
+    effectFXAA.uniforms['resolution'].value.set(1 / window.innerWidth, 1 / window.innerHeight );
+
+    var copyShader = new THREE.ShaderPass(THREE.CopyShader);
+    copyShader.renderToScreen = true;
+    
+    //Apply aura
+    bloomStrength = (0.25);
+    var bloomRadius = 2;
+    var bloomThreshold = 0.01;
+
+    bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), bloomStrength, bloomRadius, bloomThreshold);
+
+    composer = new THREE.EffectComposer(renderer);
+
+    composer.setSize(window.innerWidth, window.innerHeight);
+    composer.addPass(renderScene);
+    composer.addPass(effectFXAA);
+    composer.addPass(effectFXAA);
+
+    composer.addPass(bloomPass);
+    composer.addPass(copyShader);
 
     animate();
 
@@ -268,8 +295,6 @@ var frame = 0;
 function animate(){
     frame++;
     
-    renderer.render(scene, camera);
-    
     requestAnimationFrame(animate);
 
     skybox.rotation.y += 0.0001;
@@ -366,6 +391,9 @@ function animate(){
         }
 
     }
+
+    renderer.render(scene, camera);
+    composer.render();
 
 
     

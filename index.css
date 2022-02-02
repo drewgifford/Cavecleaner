@@ -4,3 +4,13 @@ body {
     overflow: hidden;
 }
 
+.sidebar {
+    background: #00000050;
+    display: block;
+    width: 250px;
+    height: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    padding: 1em;
+}

@@ -90,7 +90,7 @@ function generateBoard(size, startPosition, bomb_count){
             const sprite = new THREE.Sprite(textMaterial);
         
             sprite.position.set(x,y,z);
-            sprite.scale.set(0.33, 0.33, 0.33);
+            sprite.scale.set(0.5, 0.5, 0.5);
         
             textGroup.add(sprite);
         }
