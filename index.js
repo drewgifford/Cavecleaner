@@ -1,10 +1,10 @@
 let scene, camera, renderer, skyboxGeo, skybox, pivot, controls;
-var raycaster = new THREE.Raycaster();
 var mouse = new THREE.Vector2();
 
 var cubeGroup;
 var registered_cells = []
 let INTERSECTED;
+let cell_color = 0xdbdbdb;
 
 function init(){
     scene = new THREE.Scene();
@@ -42,6 +42,9 @@ function init(){
     buildCube(5,5,5);
 
     camera.lookAt(0,0,0);
+    var controls = new GrabControls(renderer, pivot);
+
+    controls.run();
 
     
 
@@ -49,15 +52,7 @@ function init(){
 
     document.addEventListener('pointermove', onDocumentMouseMove, false);
 
-
     animate();
-
-    var controls = new ObjectControls(camera, renderer.domElement, pivot);
-
-    controls.setRotationSpeed(0.0275);
-    controls.enableVerticalRotation();
-
-    controls.setMaxVerticalRotationAngle(Math.PI / 2 - 0.5, Math.PI / 2 - 0.5);
 
 }
 
@@ -118,8 +113,10 @@ function buildSkybox(){
 function buildCell(x,y,z){
 
     const cellGeo = new THREE.BoxGeometry(0.8,0.8,0.8);
-    const cellMaterial = new THREE.MeshLambertMaterial({color: 0xdbdbdb, opacity: 0.9, transparent: true});
+    const cellMaterial = new THREE.MeshLambertMaterial({color: cell_color, opacity: 0.9, transparent: true});
     const cell = new THREE.Mesh(cellGeo, cellMaterial);
+
+    cell.name = (`${x},${y},${z}`);
 
     cell.position.set(x,y,z);
 
@@ -160,38 +157,41 @@ function onDocumentMouseMove(event) {
   }
 
 function animate(){
-
-    raycaster.setFromCamera(mouse, camera);
-
-    const intersects = raycaster.intersectObjects(cubeGroup);
-
-    if ( intersects.length > 0 ) {
-
-        if ( INTERSECTED != intersects[ 0 ].object ) {
-
-            if ( INTERSECTED ) INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
-
-            INTERSECTED = intersects[ 0 ].object;
-            INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
-            INTERSECTED.material.emissive.setHex( 0xff0000 );
-
-        }
-
-    } else {
-
-        if ( INTERSECTED ) INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
-
-        INTERSECTED = null;
-
-    }
-
-
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
 
     skybox.rotation.y += 0.0001;
     skybox.rotation.x += 0.00001;
 
+    var vector = new THREE.Vector3(mouse.x, mouse.y, 1);
+    vector.unproject(camera);
+    var raycaster = new THREE.Raycaster(camera.position, vector.sub(camera.position).normalize());
+
+
+    var intersects = raycaster.intersectObject(cubeGroup, true);
+
+
+    if (intersects.length > 0) {
+        
+        var object = intersects[0].object;
+        $('html,body').css('cursor', 'pointer');
+
+        if (INTERSECTED && object != INTERSECTED){
+
+            INTERSECTED.material.color.set(cell_color);
+            INTERSECTED = null;
+
+        }
+        object.material.color.set(0xffff00);
+        INTERSECTED = object;
+ 
+    } else {
+        $('html,body').css('cursor', 'default');
+        if (INTERSECTED){
+            INTERSECTED.material.color.set(cell_color);
+            INTERSECTED = null;
+        }
+    }
     
 
     
@@ -209,3 +209,41 @@ function onWindowResize(){
 }
 
 init();
+
+revealed = [];
+function reveal(x, y, z){
+
+    console.log("Attempting to reveal",x, y, z);
+
+    if (revealed.includes({"x": x, "y": y, "z": z})) return;
+
+    var number = bombs_data[x][y][z];
+    revealed.push({"x": x, "y": y, "z": z});
+
+    console.log("Finding Object", x, y, z);
+    cubeGroup.getObjectByName(`${x},${y},${z}`).material.color.set(0x00ffff);
+
+    console.log("What's the number?", number);
+
+    if(number == 0){
+        iterate3D(3, 3, 3, function(rX, rY, rZ){
+            revealX = parseInt(x) + (rX-1);
+            revealY = parseInt(y) + (rY-1);
+            revealZ = parseInt(z) + (rZ-1);
+            reveal(revealX, revealY, revealZ);
+        });
+    }
+}
+
+$(document).click(function(e){
+
+    if(!INTERSECTED) return;
+
+    var name = INTERSECTED.name;
+
+    var coordinates = name.split(",");
+    var iX = coordinates[0]; var iY = coordinates[1]; var iZ = coordinates[2];
+
+    reveal(iX,iY,iZ);
+
+});
